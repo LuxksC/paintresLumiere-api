@@ -1,0 +1,17 @@
+org: luxkas
+service: paintresLumiere-api
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  architecture: arm64
+  region: sa-east-1
+
+
+functions:
+  status:
+    handler: src/functions/status.handler
+    events:
+      - httpApi:
+          path: /status
+          method: GET
