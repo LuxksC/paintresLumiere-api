@@ -1,69 +1,145 @@
-<!--
-title: 'AWS Simple HTTP Endpoint example in NodeJS'
-description: 'This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.'
-layout: Doc
-framework: v4
-platform: AWS
-language: nodeJS
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, Inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# Paintres Lumiere API
 
-# Serverless Framework Node HTTP API on AWS
+Backend API for **Paintres Lumiere**, built with the Serverless Framework on AWS (Lambda + API Gateway). The API is written in TypeScript and follows a controller-based structure with shared HTTP types and utilities.
 
-This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.
+---
 
-This template does not include any kind of persistence (database). For more advanced examples, check out the [serverless/examples repository](https://github.com/serverless/examples/) which includes Typescript, Mongo, DynamoDB and other examples.
+## Tech stack
 
-## Usage
+- **Runtime:** Node.js 20.x (ARM64)
+- **Language:** TypeScript
+- **Framework:** [Serverless Framework](https://www.serverless.com/) (AWS provider)
+- **Region:** `sa-east-1`
+- **API:** AWS Lambda + HTTP API (API Gateway v2)
 
-### Deployment
+---
 
-In order to deploy the example, you need to run the following command:
+## Project structure
 
 ```
+paintresLumiere-api/
+├── serverless.yml          # Service config, functions, and HTTP events
+├── package.json
+├── handler.js              # Legacy/example handler (not used by current routes)
+└── src/
+    ├── functions/          # Lambda entry points
+    │   └── status.ts       # GET /status handler
+    ├── controllers/        # Business logic per route/feature
+    │   └── StatusController.ts
+    ├── types/
+    │   └── Http.ts         # HttpRequest, HttpResponse, ProtectedHttpRequest
+    └── utils/
+        ├── http.ts         # Response helpers (ok, created, badRequest, etc.)
+        ├── parseEvent.ts   # API Gateway event → HttpRequest
+        └── parseResponse.ts # HttpResponse → Lambda return format
+```
+
+---
+
+## Architecture
+
+1. **API Gateway** receives the HTTP request and invokes the Lambda function configured in `serverless.yml`.
+2. **Function** (`src/functions/*.ts`) receives the raw event, optionally parses it with `parseEvent`, and calls the appropriate **controller**.
+3. **Controller** returns an `HttpResponse` (status code + optional body) using helpers from `src/utils/http.ts`.
+4. **parseResponse** turns that into the object Lambda/API Gateway expect (`statusCode` + stringified `body`).
+
+Shared types in `src/types/Http.ts` keep requests and responses consistent across handlers and controllers.
+
+---
+
+## API endpoints
+
+| Method | Path    | Handler              | Description                    |
+|--------|---------|----------------------|--------------------------------|
+| GET    | `/status` | `status.handler`   | Health check; returns server status |
+
+### Example: GET /status
+
+**Response (200):**
+
+```json
+{ "status": "Server Online!" }
+```
+
+---
+
+## Types and utilities
+
+### Types (`src/types/Http.ts`)
+
+- **HttpRequest** – `body`, `queryParams`, `params` (parsed from the API Gateway event).
+- **ProtectedHttpRequest** – `HttpRequest` plus `userId` (for future auth).
+- **HttpResponse** – `statusCode` and optional `body` (plain object).
+
+### HTTP helpers (`src/utils/http.ts`)
+
+- `ok(body?)` → 200  
+- `created(body?)` → 201  
+- `badRequest(body?)` → 400  
+- `unauthorized(body?)` → 401  
+- `conflict(body?)` → 409  
+
+### Event/response parsing
+
+- **parseEvent(event)** – Maps `APIGatewayProxyEventV2` to `HttpRequest` (body, path params, query params).
+- **parseResponse(response)** – Maps `HttpResponse` to the Lambda return shape (`statusCode` + JSON string for `body`).
+
+---
+
+## Development
+
+### Prerequisites
+
+- Node.js 20.x
+- [Serverless Framework](https://www.serverless.com/framework/docs/getting-started) (e.g. `npm i -g serverless`)
+- AWS credentials configured (e.g. `serverless config credentials` or environment variables)
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Deploy
+
+```bash
 serverless deploy
 ```
 
-After running deploy, you should see output similar to:
+After deploy, the CLI prints the base URL and the `GET /status` endpoint. Example:
 
 ```
-Deploying "serverless-http-api" to stage "dev" (us-east-1)
-
-✔ Service deployed to stack serverless-http-api-dev (91s)
-
-endpoint: GET - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/
-functions:
-  hello: serverless-http-api-dev-hello (1.6 kB)
+endpoint: GET - https://xxxxxxxxxx.execute-api.sa-east-1.amazonaws.com/status
 ```
 
-_Note_: In current form, after deployment, your API is public and can be invoked by anyone. For production deployments, you might want to configure an authorizer. For details on how to do that, refer to [HTTP API (API Gateway V2) event docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api).
+### Invoke the API
 
-### Invocation
-
-After successful deployment, you can call the created application via HTTP:
-
-```
-curl https://xxxxxxx.execute-api.us-east-1.amazonaws.com/
-```
-
-Which should result in response similar to:
-
-```json
-{ "message": "Go Serverless v4! Your function executed successfully!" }
+```bash
+curl https://<your-api-id>.execute-api.sa-east-1.amazonaws.com/status
 ```
 
 ### Local development
 
-The easiest way to develop and test your function is to use the `dev` command:
+Run the local Lambda emulator and develop against it:
 
-```
+```bash
 serverless dev
 ```
 
-This will start a local emulator of AWS Lambda and tunnel your requests to and from AWS Lambda, allowing you to interact with your function as if it were running in the cloud.
+Then call the same URL (or the local URL shown by the CLI). Changes are reflected without redeploying. When done, run `serverless deploy` to update the cloud stack.
 
-Now you can invoke the function as before, but this time the function will be executed locally. Now you can develop your function locally, invoke it, and see the results immediately without having to re-deploy.
+---
 
-When you are done developing, don't forget to run `serverless deploy` to deploy the function to the cloud.
+## Configuration
+
+- **Org:** `luxkas`
+- **Service:** `paintresLumiere-api`
+- **Provider:** AWS, `nodejs20.x`, `arm64`, region `sa-east-1`
+
+The API is public after deployment. For production, consider adding an authorizer (e.g. JWT or IAM) via the [Serverless HTTP API events docs](https://www.serverless.com/framework/docs/providers/aws/events/http-api).
+
+---
+
+## Summary
+
+This repo currently provides a single **GET /status** health endpoint and the foundation for more routes: controllers, shared HTTP types, response helpers, and event/response parsing. New endpoints can be added by defining functions and events in `serverless.yml` and implementing handlers and controllers under `src/functions` and `src/controllers`.
