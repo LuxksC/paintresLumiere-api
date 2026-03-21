@@ -6,7 +6,9 @@ provider:
   runtime: nodejs20.x
   architecture: arm64
   region: sa-east-1
-
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    JWT_SECRET: ${env:JWT_SECRET}
 
 functions:
   status:
@@ -15,3 +17,31 @@ functions:
       - httpApi:
           path: /status
           method: GET
+
+  signup:
+    handler: src/functions/signup.handler
+    events:
+      - httpApi:
+          path: /signup
+          method: POST
+
+  login:
+    handler: src/functions/login.handler
+    events:
+      - httpApi:
+          path: /login
+          method: POST
+
+  logout:
+    handler: src/functions/logout.handler
+    events:
+      - httpApi:
+          path: /logout
+          method: POST
+
+  deleteUser:
+    handler: src/functions/deleteUser.handler
+    events:
+      - httpApi:
+          path: /users/me
+          method: DELETE

@@ -1,0 +1,21 @@
+---
+description: Zod safeParse style in controllers and handlers
+globs: "**/controllers/**/*.ts"
+alwaysApply: false
+---
+
+# Zod `safeParse` in controllers
+
+When validating request bodies with Zod, destructure the result so `success`, `error`, and `data` are explicit:
+
+```typescript
+const { success, error, data } = schema.safeParse(body);
+
+if (!success) {
+  return badRequest({ errors: error.flatten().fieldErrors });
+}
+
+const { ... } = data;
+```
+
+Do not assign the whole result to a single variable (e.g. `const parsed = schema.safeParse(body)`).

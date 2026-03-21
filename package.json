@@ -1,7 +1,27 @@
 {
+  "name": "paintreslumiere-api",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "dotenv": "^16.4.5",
+    "drizzle-kit": "^0.31.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.44.6",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.24.1"
   }
 }
