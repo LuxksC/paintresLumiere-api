@@ -1,0 +1,30 @@
+meta {
+  name: Signup
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/signup
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "password12"
+  }
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && data.accessToken) {
+    bru.setEnvVar("accessToken", data.accessToken, { persist: true });
+  }
+}

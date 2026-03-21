@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: Paintres Lumiere API
+  description: |
+    HTTP API (AWS Lambda + API Gateway). Set **Servers** to your deployed base URL or use a tool that ignores browser CORS (e.g. Postman) if `Try it out` fails from a hosted Swagger page.
+  version: 1.0.0
+
+servers:
+  - url: https://glj3lixjr7.execute-api.sa-east-1.amazonaws.com
+
+tags:
+  - name: System
+  - name: Auth
+  - name: Users
+
+paths:
+  /status:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: getStatus
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: Server Online!
+
+  /signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      operationId: signUp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Email, CPF, or CNPJ already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Invalid email or password
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Logout (client should discard the token)
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Missing or invalid token
+
+  /users/me:
+    delete:
+      tags: [Users]
+      summary: Soft-delete the authenticated user (or target id for admins when path supports it)
+      operationId: deleteUserMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Invalid or inactive account
+        '403':
+          description: Not allowed to delete this user
+        '404':
+          description: User not found or already deleted
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT from signup or login (`accessToken`)
+
+  schemas:
+    SignUpRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        lastname:
+          type: string
+          maxLength: 255
+        type:
+          type: string
+          enum: [admin, client]
+          default: client
+        phone:
+          type: string
+          maxLength: 20
+        cpf:
+          type: string
+          maxLength: 14
+        cnpj:
+          type: string
+          maxLength: 14
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+
+    AccessTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorMessage:
+      type: object
+      properties:
+        error:
+          type: string
+
+    ValidationError:
+      type: object
+      description: Field errors from Zod (shape varies by endpoint)
+      additionalProperties: true
