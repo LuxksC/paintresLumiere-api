@@ -9,6 +9,8 @@ provider:
   environment:
     DATABASE_URL: ${env:DATABASE_URL}
     JWT_SECRET: ${env:JWT_SECRET}
+    GOOGLE_IOS_CLIENT_ID: ${env:GOOGLE_IOS_CLIENT_ID, ''}
+    GOOGLE_ANDROID_CLIENT_ID: ${env:GOOGLE_ANDROID_CLIENT_ID, ''}
 
 functions:
   status:
@@ -30,6 +32,13 @@ functions:
     events:
       - httpApi:
           path: /login
+          method: POST
+
+  authGoogle:
+    handler: src/functions/authGoogle.handler
+    events:
+      - httpApi:
+          path: /auth/google
           method: POST
 
   logout:

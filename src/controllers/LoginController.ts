@@ -32,7 +32,12 @@ export class LoginController {
       return unauthorized({ error: 'Invalid email or password.' });
     }
 
-    // Check if password is correct
+    if (!user.password) {
+      return unauthorized({
+        error: 'This account uses Google sign-in. Use /auth/google.',
+      });
+    }
+
     const valid = await compare(password, user.password);
     if (!valid) {
       return unauthorized({ error: 'Invalid email or password.' });

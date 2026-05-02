@@ -83,7 +83,34 @@ paths:
         '400':
           description: Validation error
         '401':
-          description: Invalid email or password
+          description: Invalid email or password, or account uses Google sign-in only
+
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Sign in with Google (mobile ID token)
+      description: |
+        Accepts a Google **ID token** from the native iOS/Android SDK. Verifies the token, then finds or creates the user and returns the same `accessToken` JWT as `/login`.
+      operationId: authGoogle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleAuthRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400':
+          description: Validation error or Google sign-in not configured
+        '401':
+          description: Invalid token or unverified Google email
+        '409':
+          description: Email already linked to another Google account
 
   /logout:
     post:
@@ -172,6 +199,14 @@ components:
         password:
           type: string
           minLength: 1
+
+    GoogleAuthRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken:
+          type: string
+          description: Google ID token (JWT) from the mobile SDK
 
     AccessTokenResponse:
       type: object

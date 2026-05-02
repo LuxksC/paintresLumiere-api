@@ -32,19 +32,22 @@ paintresLumiere-api/
     │   ├── status.ts
     │   ├── signup.ts
     │   ├── login.ts
+    │   ├── authGoogle.ts
     │   ├── logout.ts
     │   └── deleteUser.ts
     ├── controllers/        # Business logic per route/feature
     │   ├── StatusController.ts
     │   ├── SignUpController.ts
     │   ├── LoginController.ts
+    │   ├── GoogleAuthController.ts
     │   ├── LogoutController.ts
     │   └── DeleteUserController.ts
     ├── db/
     │   ├── index.ts        # Drizzle client (Neon serverless)
     │   └── schema.ts       # users table
     ├── libs/
-    │   └── jwt.ts          # signAccessToken, validateAccessToken
+    │   ├── jwt.ts          # signAccessToken, validateAccessToken
+    │   └── googleIdToken.ts # verify Google ID tokens (mobile)
     ├── types/
     │   └── Http.ts
     └── utils/
@@ -75,6 +78,8 @@ Copy `.env.example` to `.env` and set real values (see [Neon](https://neon.com/d
 |----------------|-------------|
 | `DATABASE_URL` | Neon Postgres connection string |
 | `JWT_SECRET`   | Secret used to sign/verify JWTs (use a long random string in production) |
+| `GOOGLE_IOS_CLIENT_ID` | Google OAuth client ID for the iOS app (for `POST /auth/google`) |
+| `GOOGLE_ANDROID_CLIENT_ID` | Google OAuth client ID for the Android app (at least one of the Google client IDs must be set) |
 
 These are passed to Lambda via `serverless.yml` under `provider.environment`. Set them in your shell (or in `.env` when using `serverless dev`) before deploy.
 
@@ -101,6 +106,7 @@ These are passed to Lambda via `serverless.yml` under `provider.environment`. Se
 | GET    | `/status`  | No    | Health check |
 | POST   | `/signup`  | No    | Create user; returns `accessToken` |
 | POST   | `/login`   | No    | Login; returns `accessToken` |
+| POST   | `/auth/google` | No | Google ID token from mobile SDK; find-or-create user; returns `accessToken` |
 | POST   | `/logout`  | Bearer | Logout (client should discard token) |
 | DELETE | `/users/me`| Bearer | Soft-delete a user (see [Delete user](#delete-user) below) |
 
@@ -120,7 +126,16 @@ These are passed to Lambda via `serverless.yml` under `provider.environment`. Se
 **Body:** `{ "email": "string", "password": "string" }`
 
 **Response (200):** `{ "accessToken": "..." }`  
-**Errors:** 400 validation, 401 invalid email or password
+**Errors:** 400 validation, 401 invalid email or password (or Google-only account — use `/auth/google`)
+
+### POST /auth/google
+
+**Body:** `{ "idToken": "<Google ID token JWT from native SDK>" }`
+
+The server verifies the token against your iOS/Android OAuth client IDs (`GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`), requires a **verified** Google email, then **finds** the user by `google_sub` or **links/creates** by email. Returns the same JWT shape as login.
+
+**Response (200):** `{ "accessToken": "..." }`  
+**Errors:** 400 validation / Google not configured, 401 invalid or unverified token, 409 email tied to another Google `sub`
 
 ### POST /logout
 

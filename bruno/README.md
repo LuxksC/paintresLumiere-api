@@ -13,7 +13,7 @@ This folder is a [Bruno](https://www.usebruno.com/) collection stored as plain f
 ## Flow
 
 1. Run **Get Status** (no auth).
-2. Run **Signup** or **Login** — a post-response script saves `accessToken` into the **Local** environment (`persist: true` in Bruno).
+2. Run **Signup**, **Login**, or **Google Auth** (paste a real `idToken` from the mobile SDK) — post-response scripts can save `accessToken` into the **Local** environment (`persist: true` in Bruno).
 3. Run **Logout** or **Delete Me** with the saved Bearer token.
 
 ## GitHub

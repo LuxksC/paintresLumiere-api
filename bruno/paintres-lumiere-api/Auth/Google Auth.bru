@@ -1,11 +1,11 @@
 meta {
-  name: Login
+  name: Google Auth
   type: http
-  seq: 4
+  seq: 3
 }
 
 post {
-  url: {{baseUrl}}/login
+  url: {{baseUrl}}/auth/google
   body: json
   auth: none
 }
@@ -16,13 +16,8 @@ headers {
 
 body:json {
   {
-    "email": "lucastest1@example.com",
-    "password": "12345678"
+    "idToken": "PASTE_GOOGLE_ID_TOKEN_FROM_MOBILE_SDK"
   }
-}
-
-vars:pre-request {
-  baseUrl: https://glj3lixjr7.execute-api.sa-east-1.amazonaws.com
 }
 
 script:post-response {
