@@ -41,6 +41,13 @@ functions:
           path: /auth/google
           method: POST
 
+  profile:
+    handler: src/functions/profile.handler
+    events:
+      - httpApi:
+          path: /profile
+          method: GET
+
   logout:
     handler: src/functions/logout.handler
     events:

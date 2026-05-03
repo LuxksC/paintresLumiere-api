@@ -112,6 +112,23 @@ paths:
         '409':
           description: Email already linked to another Google account
 
+  /profile:
+    get:
+      tags: [Users]
+      summary: Get authenticated user profile
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Invalid or missing token, or inactive account
+
   /logout:
     post:
       tags: [Auth]
@@ -207,6 +224,33 @@ components:
         idToken:
           type: string
           description: Google ID token (JWT) from the mobile SDK
+
+    ProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [admin, client]
+        name:
+          type: string
+        lastname:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+          nullable: true
+        cnpj:
+          type: string
+          nullable: true
 
     AccessTokenResponse:
       type: object
