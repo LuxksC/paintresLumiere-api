@@ -1,0 +1,19 @@
+meta {
+  name: Upload Profile Image
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/profile/image
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart-form {
+  file: @file(/Users/lucassouza/Downloads/perfil.png)
+}

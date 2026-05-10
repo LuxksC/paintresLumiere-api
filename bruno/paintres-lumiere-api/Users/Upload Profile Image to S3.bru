@@ -1,0 +1,49 @@
+meta {
+  name: Upload Profile Image to S3
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{s3UploadUrl}}
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  Content-Type: {{s3ContentType}}
+  key: {{s3Key}}
+  X-Amz-Credential: {{s3Credential}}
+  X-Amz-Algorithm: {{s3Algorithm}}
+  X-Amz-Date: {{s3Date}}
+  X-Amz-Security-Token: {{s3SecurityToken}}
+  Policy: {{s3Policy}}
+  X-Amz-Signature: {{s3Signature}}
+  file: @file(/path/to/your/image.jpg)
+}
+
+docs {
+  ## How to use
+  
+  1. Run "Get Profile Image Upload URL" first — its post-response script saves all the
+     presigned fields into environment variables automatically.
+  
+  2. Replace `/path/to/your/image.jpg` with the actual path to the image on your machine.
+  
+  3. Run this request. A 204 (No Content) response from S3 means the upload succeeded.
+  
+  ## Why so many fields?
+  
+  S3 presigned POST uses a signed policy embedded in the form fields to verify:
+  - who is uploading (Credential + Signature)
+  - what they are allowed to upload (Policy: content type, max size, key prefix)
+  - when the upload was signed (Date) and expires
+  
+  All fields must be present and unmodified — changing any of them invalidates the
+  signature and S3 will return a 403.
+  
+  ## Field order matters
+  
+  AWS S3 requires the `file` field to be the last field in the multipart form.
+  Bruno sends fields in the order they are listed here, so do not move `file` up.
+}

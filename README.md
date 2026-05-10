@@ -4,6 +4,12 @@ Backend API for **Paintres Lumiere**, built with the Serverless Framework on AWS
 
 ---
 
+## Documentation
+
+- [Image Upload Strategy](docs/IMAGE_UPLOAD_STRATEGY.md) — how S3, SQS, and Google auth work together for profile images.
+
+---
+
 ## Tech stack
 
 - **Runtime:** Node.js 20.x (ARM64)

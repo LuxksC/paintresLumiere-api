@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   varchar,
+  text,
   timestamp,
   pgEnum
 } from 'drizzle-orm/pg-core';
@@ -22,6 +23,7 @@ export const usersTable = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   password: varchar('password', { length: 255 }),
   googleSub: varchar('google_sub', { length: 255 }).unique(),
+  image: text('image'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),

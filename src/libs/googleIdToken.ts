@@ -10,6 +10,7 @@ export type GoogleUserFromIdToken = {
   name?: string;
   givenName?: string;
   familyName?: string;
+  picture?: string;
 };
 
 export async function verifyGoogleIdToken(
@@ -41,5 +42,6 @@ export async function verifyGoogleIdToken(
     name: payload.name,
     givenName: payload.given_name,
     familyName: payload.family_name,
+    picture: payload.picture,
   };
 }

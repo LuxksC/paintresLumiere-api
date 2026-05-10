@@ -18,6 +18,7 @@ const schema = z.object({
   cnpj: z.string().max(14).optional(),
   email: z.string().email('Invalid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  image: z.string().url('Invalid image URL').optional(),
 });
 
 export class SignUpController {
@@ -28,7 +29,7 @@ export class SignUpController {
       return badRequest({ errors: error.flatten().fieldErrors });
     }
 
-    const { name, lastname, type, phone, cpf, cnpj, email, password } = data;
+    const { name, lastname, type, phone, cpf, cnpj, email, password, image } = data;
 
     // Check if email is already registered
     const emailTakenError = await conflictIfUserPropertyExists(
@@ -68,6 +69,7 @@ export class SignUpController {
         ...(isNonEmptyString(phone) ? { phone } : {}),
         ...(isNonEmptyString(cpf) ? { cpf } : {}),
         ...(isNonEmptyString(cnpj) ? { cnpj } : {}),
+        ...(isNonEmptyString(image) ? { image } : {}),
       })
       .returning({ id: usersTable.id });
 

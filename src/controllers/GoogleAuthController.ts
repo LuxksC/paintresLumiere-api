@@ -4,6 +4,7 @@ import { db } from '../db';
 import { usersTable } from '../db/schema';
 import { verifyGoogleIdToken } from '../libs/googleIdToken';
 import { signAccessToken } from '../libs/jwt';
+import { StorageService } from '../services/StorageService';
 import type { HttpRequest, HttpResponse } from '../types/Http';
 import { badRequest, conflict, ok, unauthorized } from '../utils/http';
 
@@ -53,23 +54,32 @@ export class GoogleAuthController {
     }
 
     const byEmail = await db.query.usersTable.findFirst({
-      columns: { id: true, googleSub: true },
+      columns: { id: true, googleSub: true, image: true },
       where: and(eq(usersTable.email, email), isNull(usersTable.deletedAt)),
     });
 
     if (byEmail) {
       if (byEmail.googleSub && byEmail.googleSub !== sub) {
-        // find the user email on databse but linked to another google token
         return conflict({
           error: 'This email is linked to another Google account.',
         });
       }
 
-      // find user email in database but without a google token reregistered
-      // Than -> register google token received with user in database.
+      const bucket = process.env.UPLOADS_BUCKET;
+      const googlePicture = googleUser.picture?.trim() ?? null;
+      const updateData: Record<string, unknown> = { googleSub: sub, updatedAt: new Date() };
+
+      if (bucket && byEmail.image && StorageService.isS3Url(byEmail.image, bucket)) {
+        // User had a profile image on S3 — delete it and switch to Google's picture
+        await StorageService.deleteObject(bucket, StorageService.extractS3Key(byEmail.image));
+        updateData.image = googlePicture;
+      } else if (googlePicture && !byEmail.image) {
+        updateData.image = googlePicture;
+      }
+
       await db
         .update(usersTable)
-        .set({ googleSub: sub, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(usersTable.id, byEmail.id));
 
       return ok({ accessToken: signAccessToken(byEmail.id) });
@@ -82,6 +92,7 @@ export class GoogleAuthController {
       googleUser.givenName?.trim() ||
       email.split('@')[0];
     const lastname = googleUser.familyName?.trim();
+    const picture = googleUser.picture?.trim();
 
     const [created] = await db
       .insert(usersTable)
@@ -90,6 +101,7 @@ export class GoogleAuthController {
         ...(lastname ? { lastname } : {}),
         email,
         googleSub: sub,
+        ...(picture ? { image: picture } : {}),
       })
       .returning({ id: usersTable.id });
 

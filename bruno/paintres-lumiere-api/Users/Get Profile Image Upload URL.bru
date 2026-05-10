@@ -1,0 +1,31 @@
+meta {
+  name: Get Profile Image Upload URL
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/profile/image/upload-url?contentType=image/jpeg
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && data.url) {
+    const f = data.fields || {};
+    bru.setEnvVar("s3UploadUrl", data.url);
+    bru.setEnvVar("s3ContentType", f["Content-Type"] || "");
+    bru.setEnvVar("s3Key", f["key"] || "");
+    bru.setEnvVar("s3Credential", f["X-Amz-Credential"] || "");
+    bru.setEnvVar("s3Algorithm", f["X-Amz-Algorithm"] || "");
+    bru.setEnvVar("s3Date", f["X-Amz-Date"] || "");
+    bru.setEnvVar("s3SecurityToken", f["X-Amz-Security-Token"] || "");
+    bru.setEnvVar("s3Policy", f["Policy"] || "");
+    bru.setEnvVar("s3Signature", f["X-Amz-Signature"] || "");
+  }
+}

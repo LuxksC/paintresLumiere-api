@@ -11,6 +11,7 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
     "@types/bcryptjs": "^2.4.6",
+    "@types/busboy": "^1.5.4",
     "@types/jsonwebtoken": "^9.0.10",
     "dotenv": "^16.4.5",
     "drizzle-kit": "^0.31.5",
@@ -18,8 +19,11 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1041.0",
+    "@aws-sdk/s3-presigned-post": "^3.1041.0",
     "@neondatabase/serverless": "^1.0.2",
     "bcryptjs": "^2.4.3",
+    "busboy": "^1.6.0",
     "drizzle-orm": "^0.44.6",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.2",

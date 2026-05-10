@@ -27,6 +27,7 @@ export class ProfileController {
         email: true,
         cpf: true,
         cnpj: true,
+        image: true,
       },
       where: and(eq(usersTable.id, userId), isNull(usersTable.deletedAt)),
     });

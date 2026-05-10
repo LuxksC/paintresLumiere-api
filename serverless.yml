@@ -11,6 +11,16 @@ provider:
     JWT_SECRET: ${env:JWT_SECRET}
     GOOGLE_IOS_CLIENT_ID: ${env:GOOGLE_IOS_CLIENT_ID, ''}
     GOOGLE_ANDROID_CLIENT_ID: ${env:GOOGLE_ANDROID_CLIENT_ID, ''}
+    UPLOADS_BUCKET: !Ref UploadsBucket
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource: !Join ['', [!GetAtt UploadsBucket.Arn, '/*']]
 
 functions:
   status:
@@ -48,6 +58,27 @@ functions:
           path: /profile
           method: GET
 
+  uploadProfileImage:
+    handler: src/functions/uploadProfileImage.handler
+    events:
+      - httpApi:
+          path: /profile/image
+          method: POST
+
+  profileImageUploadUrl:
+    handler: src/functions/profileImageUploadUrl.handler
+    events:
+      - httpApi:
+          path: /profile/image/upload-url
+          method: GET
+
+  processProfileImage:
+    handler: src/functions/processProfileImage.handler
+    events:
+      - sqs:
+          arn: !GetAtt ProfileImagesQueue.Arn
+          batchSize: 1
+
   logout:
     handler: src/functions/logout.handler
     events:
@@ -61,3 +92,50 @@ functions:
       - httpApi:
           path: /users/me
           method: DELETE
+
+resources:
+  Resources:
+    ProfileImagesQueueDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: paintres-lumiere-profile-images-queue-dlq
+
+    ProfileImagesQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: paintres-lumiere-profile-images-queue
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt ProfileImagesQueueDLQ.Arn
+          maxReceiveCount: 3
+
+    ProfileImagesQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: s3.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt ProfileImagesQueue.Arn
+              Condition:
+                ArnLike:
+                  aws:SourceArn: arn:aws:s3:::paintres-lumiere-uploads
+        Queues:
+          - !Ref ProfileImagesQueue
+
+    UploadsBucket:
+      Type: AWS::S3::Bucket
+      DependsOn: ProfileImagesQueuePolicy
+      Properties:
+        BucketName: paintres-lumiere-uploads
+        NotificationConfiguration:
+          QueueConfigurations:
+            - Event: 's3:ObjectCreated:*'
+              Filter:
+                S3Key:
+                  Rules:
+                    - Name: prefix
+                      Value: profile-images/
+              Queue: !GetAtt ProfileImagesQueue.Arn

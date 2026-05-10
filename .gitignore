@@ -1,3 +1,6 @@
 node_modules
 .serverless
 .env
+
+# Claude
+.claude

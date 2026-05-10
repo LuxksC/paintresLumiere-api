@@ -90,7 +90,7 @@ paths:
       tags: [Auth]
       summary: Sign in with Google (mobile ID token)
       description: |
-        Accepts a Google **ID token** from the native iOS/Android SDK. Verifies the token, then finds or creates the user and returns the same `accessToken` JWT as `/login`.
+        Accepts a Google **ID token** from the native iOS/Android SDK. Verifies the token, then finds or creates the user and returns the same `accessToken` JWT as `/login`. When creating a new user, the profile picture URL from Google is automatically stored as the user's `image`.
       operationId: authGoogle
       requestBody:
         required: true
@@ -126,6 +126,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Invalid or missing token, or inactive account
+
+  /profile/image:
+    post:
+      tags: [Users]
+      summary: Upload a profile picture
+      description: |
+        Accepts a `multipart/form-data` request with a single file field named `file`. The API uploads the image directly to S3 and returns the final image URL. The user's profile is updated asynchronously within a few seconds.
+
+        **Not available for accounts linked to Google** — those use the picture provided by Google.
+
+        Allowed types: `image/png`, `image/jpeg`, `image/jpg`, `image/heic`. Max size: **4 MB**.
+
+        > The 4 MB limit (vs 5 MB on the presigned URL flow) exists because API Gateway
+        > base64-encodes binary payloads before passing them to Lambda, adding ~33% overhead.
+        > A 5 MB file would exceed Lambda's 6 MB event payload limit before the API can run.
+      operationId: uploadProfileImage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (png, jpeg, jpg, heic — max 4 MB)
+      responses:
+        '200':
+          description: OK — image uploaded, profile will reflect the new URL within seconds
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  image:
+                    type: string
+                    format: uri
+                    description: S3 URL of the uploaded image
+        '400':
+          description: Missing file, unsupported type, file too large, or account linked to Google
+        '401':
+          description: Invalid or missing token, or inactive account
+
+  /profile/image/upload-url:
+    get:
+      tags: [Users]
+      summary: Get a presigned URL to upload a profile picture
+      description: |
+        Returns a presigned S3 POST URL and form fields. The client must upload the image directly to S3 using a `multipart/form-data` POST request, including all returned `fields` alongside the image file.
+
+        **Not available for accounts linked to Google** — those use the picture provided by Google.
+
+        Allowed types: `image/png`, `image/jpeg`, `image/jpg`, `image/heic`. Max size: **5 MB**.
+
+        After a successful upload, the user's `image` field (visible on `GET /profile`) is updated asynchronously within a few seconds.
+      operationId: getProfileImageUploadUrl
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: contentType
+          required: true
+          schema:
+            type: string
+            enum: [image/png, image/jpeg, image/jpg, image/heic]
+          description: MIME type of the image to upload
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUploadResponse'
+        '400':
+          description: Invalid contentType, or account is linked to Google
         '401':
           description: Invalid or missing token, or inactive account
 
@@ -205,6 +286,11 @@ components:
         password:
           type: string
           minLength: 8
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the user's profile picture
 
     LoginRequest:
       type: object
@@ -251,6 +337,27 @@ components:
         cnpj:
           type: string
           nullable: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the user's profile picture
+
+    PresignedUploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: S3 endpoint to POST the image to
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+          description: Form fields that must be included in the multipart/form-data POST alongside the file
+        key:
+          type: string
+          description: S3 object key of the uploaded image
 
     AccessTokenResponse:
       type: object
