@@ -1,0 +1,34 @@
+meta {
+  name: Create Product
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/products
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "sku": "1234567890",
+    "name": "Acrylic Mirror Cake Topper - Custom Name",
+    "category": "names",
+    "selling_price": 45.00,
+    "color": "gold",
+    "description": "High-quality laser-cut acrylic name for party decoration.",
+    "stock_quantity": 120,
+    "discount_rate": 0.10,
+    "production_cost": 10.50,
+    "thickness": 3,
+    "barcode": "7891234567890",
+    "height": 150.0,
+    "width": 100.0
+  }
+}

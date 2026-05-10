@@ -93,6 +93,13 @@ functions:
           path: /users/me
           method: DELETE
 
+  createProduct:
+    handler: src/functions/createProduct.handler
+    events:
+      - httpApi:
+          path: /products
+          method: POST
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:

@@ -12,6 +12,7 @@ tags:
   - name: System
   - name: Auth
   - name: Users
+  - name: Products
 
 paths:
   /status:
@@ -248,6 +249,44 @@ paths:
         '404':
           description: User not found or already deleted
 
+  /products:
+    post:
+      tags: [Products]
+      summary: Create a product
+      description: Admin only. The `slug` is auto-generated from the `name`. `thickness` defaults to `3` and `dimensions_unit` defaults to `mm`.
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  slug:
+                    type: string
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+
 components:
   securitySchemes:
     bearerAuth:
@@ -381,3 +420,58 @@ components:
       type: object
       description: Field errors from Zod (shape varies by endpoint)
       additionalProperties: true
+
+
+    CreateProductRequest:
+      type: object
+      required: [sku, name, category, selling_price, color]
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        selling_price:
+          type: number
+          format: float
+        color:
+          type: string
+          enum: [gold, silver, bronze, rose, transparent, black]
+        description:
+          type: string
+        stock_quantity:
+          type: integer
+          minimum: 0
+        discount_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        production_cost:
+          type: number
+          format: float
+        thickness:
+          type: number
+          format: float
+          default: 3
+        barcode:
+          type: string
+          maxLength: 14
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        height:
+          type: number
+          format: float
+        width:
+          type: number
+          format: float
+        length:
+          type: number
+          format: float
+        dimensions_unit:
+          type: string
+          default: mm
+
