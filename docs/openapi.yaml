@@ -250,6 +250,24 @@ paths:
           description: User not found or already deleted
 
   /products:
+    get:
+      tags: [Products]
+      summary: List active products
+      description: Returns all products that are not soft-deleted and do not have `status = inactive`. Products with `status = out_of_stock` are included.
+      operationId: getProducts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductListItem'
+
     post:
       tags: [Products]
       summary: Create a product
@@ -420,6 +438,39 @@ components:
       type: object
       description: Field errors from Zod (shape varies by endpoint)
       additionalProperties: true
+
+    ProductListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        stock_quantity:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        pricing:
+          $ref: '#/components/schemas/ProductPricing'
+        specifications:
+          type: object
+          properties:
+            thickness:
+              type: number
+              format: float
+              description: Thickness in dimensions_unit (default mm)
 
 
     CreateProductRequest:
