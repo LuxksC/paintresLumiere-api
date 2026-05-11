@@ -373,6 +373,37 @@ paths:
         '404':
           description: Product not found or already deleted
 
+    delete:
+      tags: [Products]
+      summary: Soft-delete a product
+      description: Admin only. Sets `deleted_at` to now and forces `status` to `inactive`.
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Product UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing id
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+        '404':
+          description: Product not found or already deleted
+
 components:
   securitySchemes:
     bearerAuth:

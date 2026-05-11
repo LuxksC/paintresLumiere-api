@@ -121,6 +121,13 @@ functions:
           path: /products/{id}
           method: PUT
 
+  deleteProduct:
+    handler: src/functions/deleteProduct.handler
+    events:
+      - httpApi:
+          path: /products/{id}
+          method: DELETE
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:
