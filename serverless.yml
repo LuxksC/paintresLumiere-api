@@ -114,6 +114,13 @@ functions:
           path: /products/sku/{sku}
           method: GET
 
+  updateProduct:
+    handler: src/functions/updateProduct.handler
+    events:
+      - httpApi:
+          path: /products/{id}
+          method: PUT
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:

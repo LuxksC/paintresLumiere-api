@@ -335,6 +335,44 @@ paths:
         '404':
           description: No products found for the given SKU
 
+  /products/{id}:
+    put:
+      tags: [Products]
+      summary: Update a product
+      description: Admin only. All fields are optional. If `name` is updated, `slug` is automatically regenerated.
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Product UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Validation error or missing id
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+        '404':
+          description: Product not found or already deleted
+
 components:
   securitySchemes:
     bearerAuth:
@@ -629,3 +667,52 @@ components:
           type: string
           default: mm
 
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        selling_price:
+          type: number
+          format: float
+        color:
+          type: string
+          enum: [gold, silver, bronze, rose, transparent, black]
+        description:
+          type: string
+        stock_quantity:
+          type: integer
+          minimum: 0
+        discount_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        production_cost:
+          type: number
+          format: float
+        thickness:
+          type: number
+          format: float
+        barcode:
+          type: string
+          maxLength: 14
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        height:
+          type: number
+          format: float
+        width:
+          type: number
+          format: float
+        length:
+          type: number
+          format: float
+        dimensions_unit:
+          type: string
