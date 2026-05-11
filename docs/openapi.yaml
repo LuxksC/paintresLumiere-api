@@ -305,6 +305,36 @@ paths:
         '403':
           description: Admin access required
 
+  /products/sku/{sku}:
+    get:
+      tags: [Products]
+      summary: Get all product variants by SKU
+      description: Returns the full detail of every product that shares the given SKU (e.g. same design, different colors).
+      operationId: getProductBySku
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+          description: The SKU code shared by the product group
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductDetail'
+        '400':
+          description: SKU not provided
+        '404':
+          description: No products found for the given SKU
+
 components:
   securitySchemes:
     bearerAuth:
@@ -439,6 +469,21 @@ components:
       description: Field errors from Zod (shape varies by endpoint)
       additionalProperties: true
 
+    ProductPricing:
+      type: object
+      properties:
+        selling_price:
+          type: number
+          format: float
+        discount_rate:
+          type: number
+          format: float
+          description: Value from 0 to 1 (e.g. 0.10 = 10%)
+        final_price:
+          type: number
+          format: float
+          description: Computed as selling_price * (1 - discount_rate)
+
     ProductListItem:
       type: object
       properties:
@@ -472,6 +517,64 @@ components:
               format: float
               description: Thickness in dimensions_unit (default mm)
 
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        stock_quantity:
+          type: integer
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        barcode:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        pricing:
+          $ref: '#/components/schemas/ProductPricing'
+        specifications:
+          type: object
+          properties:
+            color:
+              type: string
+              enum: [gold, silver, bronze, rose, transparent, black]
+            dimensions:
+              type: object
+              properties:
+                height:
+                  type: number
+                  format: float
+                  nullable: true
+                width:
+                  type: number
+                  format: float
+                  nullable: true
+                length:
+                  type: number
+                  format: float
+                  nullable: true
+                thickness:
+                  type: number
+                  format: float
+                unit:
+                  type: string
+                  example: mm
 
     CreateProductRequest:
       type: object

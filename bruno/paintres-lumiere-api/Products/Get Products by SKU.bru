@@ -1,0 +1,15 @@
+meta {
+  name: Get Products by SKU
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/products/sku/{{productSku}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  productSku: 1234567890
+}

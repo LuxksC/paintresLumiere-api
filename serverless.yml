@@ -107,6 +107,13 @@ functions:
           path: /products
           method: POST
 
+  getProductBySku:
+    handler: src/functions/getProductBySku.handler
+    events:
+      - httpApi:
+          path: /products/sku/{sku}
+          method: GET
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:
