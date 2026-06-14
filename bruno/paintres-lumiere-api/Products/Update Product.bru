@@ -1,0 +1,28 @@
+meta {
+  name: Update Product
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/products/{{productId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "selling_price": 49.90,
+    "discount_rate": 0.05,
+    "stock_quantity": 200
+  }
+}
+
+vars:pre-request {
+  productId: 8f3e2b14-6a9d-4c32-b101-5e7f8a9b0c12
+}

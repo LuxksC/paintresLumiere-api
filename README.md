@@ -7,6 +7,7 @@ Backend API for **Paintres Lumiere**, built with the Serverless Framework on AWS
 ## Documentation
 
 - [Image Upload Strategy](docs/IMAGE_UPLOAD_STRATEGY.md) — how S3, SQS, and Google auth work together for profile images.
+- [OpenAPI spec](docs/openapi.yaml) — full request/response schemas for every endpoint.
 
 ---
 
@@ -47,10 +48,16 @@ paintresLumiere-api/
     │   ├── LoginController.ts
     │   ├── GoogleAuthController.ts
     │   ├── LogoutController.ts
-    │   └── DeleteUserController.ts
+    │   ├── DeleteUserController.ts
+    │   ├── GetProductsController.ts
+    │   ├── GetPopularProductsController.ts
+    │   ├── GetProductBySkuController.ts
+    │   ├── CreateProductController.ts
+    │   ├── UpdateProductController.ts
+    │   └── DeleteProductController.ts
     ├── db/
     │   ├── index.ts        # Drizzle client (Neon serverless)
-    │   └── schema.ts       # users table
+    │   └── schema.ts       # users + products tables
     ├── libs/
     │   ├── jwt.ts          # signAccessToken, validateAccessToken
     │   └── googleIdToken.ts # verify Google ID tokens (mobile)
@@ -60,7 +67,9 @@ paintresLumiere-api/
         ├── http.ts
         ├── parseEvent.ts
         ├── parseProtectedEvent.ts  # Event + JWT → ProtectedHttpRequest
-        └── parseResponse.ts
+        ├── parseResponse.ts
+        ├── requireAdmin.ts         # Guard helper for admin-only routes
+        └── string.ts               # generateSlug() for product names
 ```
 
 ---
@@ -115,6 +124,12 @@ These are passed to Lambda via `serverless.yml` under `provider.environment`. Se
 | POST   | `/auth/google` | No | Google ID token from mobile SDK; find-or-create user; returns `accessToken` |
 | POST   | `/logout`  | Bearer | Logout (client should discard token) |
 | DELETE | `/users/me`| Bearer | Soft-delete a user (see [Delete user](#delete-user) below) |
+| GET    | `/products` | No   | List active products, deduped by SKU |
+| GET    | `/products/popular` | No | Top products ranked by total `sales_count` per SKU (`?limit=` up to 20, default 10) |
+| GET    | `/products/sku/{sku}` | No | All variants for a given SKU (color/dimension details) |
+| POST   | `/products` | Bearer (admin) | Create a product variant |
+| PUT    | `/products/{id}` | Bearer (admin) | Update an existing product |
+| DELETE | `/products/{id}` | Bearer (admin) | Soft-delete a product (sets `deleted_at` and `status = inactive`) |
 
 ### GET /status
 
@@ -194,6 +209,146 @@ curl -X DELETE \
 | **401** | Missing/invalid token, or token refers to a missing / already soft-deleted account (`Invalid or inactive account.`). |
 | **403** | Authenticated user is not an admin and is trying to delete someone else (`You do not have permission to delete this user.`). |
 | **404** | Target user does not exist or was already soft-deleted (`User not found or already deleted.`). |
+
+---
+
+## Products
+
+Products live in the `products` table (see `src/db/schema.ts`). The same SKU may have multiple rows — each row is a **variant** (e.g. different color or dimensions) and is identified by its `id`. Public listing endpoints dedupe by SKU and surface a single "catalog representative" per SKU; SKU detail returns every variant.
+
+**Schema highlights**
+
+- `category`: `names | numbers | images | letters`
+- `color`: `gold | silver | bronze | rose | transparent | black`
+- `status`: `active | inactive | out_of_stock` (defaults to `active`)
+- `selling_price`, `production_cost`, `discount_rate` are stored as numerics; `discount_rate` is a fraction in `[0, 1]`.
+- Dimensions (`height`, `width`, `length`, `thickness`) are stored as doubles with a `dimensions_unit` (defaults to `mm`); `thickness` defaults to `3.0`.
+- `slug` is auto-generated from `name` via `generateSlug` on create/update (unique).
+- `deleted_at` enables soft deletes; deleted rows are filtered from all reads.
+
+**Mutations require admin** — `POST`, `PUT`, and `DELETE` go through `requireAdmin` (`src/utils/requireAdmin.ts`), which checks `users.type === 'admin'` for the JWT subject. Non-admin callers get `403`; missing/invalid token gets `401`.
+
+### GET /products
+
+Returns active products grouped to one entry per SKU (oldest variant wins).
+
+**Response (200):**
+
+```json
+{
+  "products": [
+    {
+      "id": "uuid",
+      "sku": "string",
+      "name": "string",
+      "slug": "string",
+      "description": "string | null",
+      "images": ["url"],
+      "stock_quantity": 0,
+      "status": "active",
+      "pricing": {
+        "selling_price": 0.0,
+        "discount_rate": 0.0,
+        "final_price": 0.0
+      },
+      "specifications": { "thickness": 3.0 }
+    }
+  ]
+}
+```
+
+### GET /products/popular
+
+Same response shape as `/products`, but ranked by **total `sales_count` summed across all variants of the SKU**, ties broken by most recent `created_at`.
+
+**Query params**
+
+| Param   | Type | Default | Notes |
+|---------|------|---------|-------|
+| `limit` | int  | 10      | Capped at 20; must be `>= 1` (returns 400 otherwise). |
+
+### GET /products/sku/{sku}
+
+Returns **every** active variant matching the SKU with full color/dimension details.
+
+**Response (200):**
+
+```json
+{
+  "products": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "slug": "string",
+      "description": "string | null",
+      "images": ["url"],
+      "stock_quantity": 0,
+      "category": "names",
+      "barcode": "string | null",
+      "status": "active",
+      "pricing": { "selling_price": 0.0, "discount_rate": 0.0, "final_price": 0.0 },
+      "specifications": {
+        "color": "gold",
+        "dimensions": {
+          "height": 0.0,
+          "width": 0.0,
+          "length": 0.0,
+          "thickness": 3.0,
+          "unit": "mm"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Errors:** 400 missing SKU, 404 no products for SKU.
+
+### POST /products
+
+**Headers:** `Authorization: Bearer <accessToken>` (admin only)
+
+**Body**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `sku` | string | yes | |
+| `name` | string | yes | Used to derive `slug` |
+| `category` | enum | yes | `names \| numbers \| images \| letters` |
+| `selling_price` | number | yes | > 0 |
+| `color` | enum | yes | `gold \| silver \| bronze \| rose \| transparent \| black` |
+| `description` | string | no | |
+| `stock_quantity` | int | no | `>= 0` |
+| `discount_rate` | number | no | `0 <= x <= 1` |
+| `production_cost` | number | no | > 0 |
+| `thickness` | number | no | > 0, defaults to `3` |
+| `barcode` | string | no | up to 14 chars |
+| `status` | enum | no | `active \| inactive \| out_of_stock` |
+| `height`, `width`, `length` | number | no | > 0 |
+| `dimensions_unit` | string | no | up to 10 chars (default `mm`) |
+
+**Response (201):** `{ "id": "uuid", "slug": "string" }`
+**Errors:** 400 validation, 401 missing/invalid token, 403 non-admin.
+
+### PUT /products/{id}
+
+**Headers:** `Authorization: Bearer <accessToken>` (admin only)
+
+**Path params:** `id` — the variant UUID returned by `POST /products`.
+
+**Body:** any subset of the fields accepted by `POST /products`. Renaming via `name` regenerates `slug` automatically; `updated_at` is bumped on every successful call.
+
+**Response (200):** `{ "message": "Product updated successfully." }`
+**Errors:** 400 validation or missing id, 401 missing/invalid token, 403 non-admin, 404 product not found (or already soft-deleted).
+
+### DELETE /products/{id}
+
+**Headers:** `Authorization: Bearer <accessToken>` (admin only)
+
+Soft-deletes the product: sets `deleted_at = now()` and `status = 'inactive'`. Subsequent reads ignore the row.
+
+**Response (200):** `{ "message": "Product deleted successfully." }`
+**Errors:** 400 missing id, 401 missing/invalid token, 403 non-admin, 404 product not found (or already soft-deleted).
 
 ---
 
@@ -289,4 +444,4 @@ The API is public after deployment. For production, consider adding an authorize
 
 ## Summary
 
-The API provides a **GET /status** health check and **authentication**: signup, login, logout, and delete user. Auth uses JWT access tokens; protected routes (`/logout`, `DELETE /users/me`) require the `Authorization: Bearer <accessToken>` header. Delete is allowed for **admins** or when deleting **your own** account (see [Delete user](#delete-user)). The database is Neon (Postgres) with Drizzle ORM; schema lives in `src/db/schema.ts`. New endpoints can be added by defining functions and events in `serverless.yml` and implementing handlers and controllers under `src/functions` and `src/controllers`.
+The API provides a **GET /status** health check, **authentication** (signup, login, logout, delete user, Google sign-in), and a **products catalog** (list, popular, by-SKU, create, update, delete). Auth uses JWT access tokens; protected routes (`/logout`, `DELETE /users/me`, all product mutations) require the `Authorization: Bearer <accessToken>` header. User deletion is allowed for **admins** or when deleting **your own** account (see [Delete user](#delete-user)); product mutations are **admin-only** via `requireAdmin`. The database is Neon (Postgres) with Drizzle ORM; schema (`users`, `products`) lives in `src/db/schema.ts`. New endpoints can be added by defining functions and events in `serverless.yml` and implementing handlers and controllers under `src/functions` and `src/controllers`.

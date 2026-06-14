@@ -12,6 +12,7 @@ tags:
   - name: System
   - name: Auth
   - name: Users
+  - name: Products
 
 paths:
   /status:
@@ -248,6 +249,196 @@ paths:
         '404':
           description: User not found or already deleted
 
+  /products:
+    get:
+      tags: [Products]
+      summary: List active products
+      description: |
+        Returns all products that are not soft-deleted and do not have `status = inactive`. Products with `status = out_of_stock` are included.
+
+        The list is **deduplicated by SKU** — when multiple variants share a SKU (e.g. same design in different colors/sizes), only the oldest variant of each group is returned as the catalog representative. Items are ordered by `created_at ASC`.
+      operationId: getProducts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductListItem'
+
+    post:
+      tags: [Products]
+      summary: Create a product
+      description: Admin only. The `slug` is auto-generated from the `name`. `thickness` defaults to `3` and `dimensions_unit` defaults to `mm`.
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  slug:
+                    type: string
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+
+  /products/popular:
+    get:
+      tags: [Products]
+      summary: List popular products
+      description: |
+        Returns the top-selling products, deduplicated by SKU. `sales_count` is aggregated across all variants that share the same SKU. Sorted by total `sales_count` DESC, then `created_at` DESC as a tiebreaker. Used for "Most Popular" sections in clients.
+      operationId: getPopularProducts
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+          description: Maximum number of products to return. Capped at 20.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductListItem'
+        '400':
+          description: Invalid limit value
+
+  /products/sku/{sku}:
+    get:
+      tags: [Products]
+      summary: Get all product variants by SKU
+      description: Returns the full detail of every product that shares the given SKU (e.g. same design, different colors).
+      operationId: getProductBySku
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+          description: The SKU code shared by the product group
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductDetail'
+        '400':
+          description: SKU not provided
+        '404':
+          description: No products found for the given SKU
+
+  /products/{id}:
+    put:
+      tags: [Products]
+      summary: Update a product
+      description: Admin only. All fields are optional. If `name` is updated, `slug` is automatically regenerated.
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Product UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Validation error or missing id
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+        '404':
+          description: Product not found or already deleted
+
+    delete:
+      tags: [Products]
+      summary: Soft-delete a product
+      description: Admin only. Sets `deleted_at` to now and forces `status` to `inactive`.
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Product UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing id
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+        '404':
+          description: Product not found or already deleted
+
 components:
   securitySchemes:
     bearerAuth:
@@ -381,3 +572,215 @@ components:
       type: object
       description: Field errors from Zod (shape varies by endpoint)
       additionalProperties: true
+
+    ProductPricing:
+      type: object
+      properties:
+        selling_price:
+          type: number
+          format: float
+        discount_rate:
+          type: number
+          format: float
+          description: Value from 0 to 1 (e.g. 0.10 = 10%)
+        final_price:
+          type: number
+          format: float
+          description: Computed as selling_price * (1 - discount_rate)
+
+    ProductListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        stock_quantity:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        pricing:
+          $ref: '#/components/schemas/ProductPricing'
+        specifications:
+          type: object
+          properties:
+            thickness:
+              type: number
+              format: float
+              description: Thickness in dimensions_unit (default mm)
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        stock_quantity:
+          type: integer
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        barcode:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        pricing:
+          $ref: '#/components/schemas/ProductPricing'
+        specifications:
+          type: object
+          properties:
+            color:
+              type: string
+              enum: [gold, silver, bronze, rose, transparent, black]
+            dimensions:
+              type: object
+              properties:
+                height:
+                  type: number
+                  format: float
+                  nullable: true
+                width:
+                  type: number
+                  format: float
+                  nullable: true
+                length:
+                  type: number
+                  format: float
+                  nullable: true
+                thickness:
+                  type: number
+                  format: float
+                unit:
+                  type: string
+                  example: mm
+
+    CreateProductRequest:
+      type: object
+      required: [sku, name, category, selling_price, color]
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        selling_price:
+          type: number
+          format: float
+        color:
+          type: string
+          enum: [gold, silver, bronze, rose, transparent, black]
+        description:
+          type: string
+        stock_quantity:
+          type: integer
+          minimum: 0
+        discount_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        production_cost:
+          type: number
+          format: float
+        thickness:
+          type: number
+          format: float
+          default: 3
+        barcode:
+          type: string
+          maxLength: 14
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        height:
+          type: number
+          format: float
+        width:
+          type: number
+          format: float
+        length:
+          type: number
+          format: float
+        dimensions_unit:
+          type: string
+          default: mm
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+          enum: [names, numbers, images, letters]
+        selling_price:
+          type: number
+          format: float
+        color:
+          type: string
+          enum: [gold, silver, bronze, rose, transparent, black]
+        description:
+          type: string
+        stock_quantity:
+          type: integer
+          minimum: 0
+        discount_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        production_cost:
+          type: number
+          format: float
+        thickness:
+          type: number
+          format: float
+        barcode:
+          type: string
+          maxLength: 14
+        status:
+          type: string
+          enum: [active, inactive, out_of_stock]
+        height:
+          type: number
+          format: float
+        width:
+          type: number
+          format: float
+        length:
+          type: number
+          format: float
+        dimensions_unit:
+          type: string

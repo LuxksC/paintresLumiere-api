@@ -22,6 +22,27 @@
       "when": 1777816974223,
       "tag": "0002_fresh_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778448349873,
+      "tag": "0003_flashy_madame_web",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778452072834,
+      "tag": "0004_colorful_misty_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779663979015,
+      "tag": "0005_complex_norman_osborn",
+      "breakpoints": true
     }
   ]
 }
