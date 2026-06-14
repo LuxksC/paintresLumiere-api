@@ -76,6 +76,7 @@ export const productsTable = pgTable('products', {
   slug: varchar('slug', { length: 255 }).unique().notNull(),
   barcode: varchar('barcode', { length: 14 }),
   status: productStatus('status').default('active'),
+  salesCount: integer('sales_count').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

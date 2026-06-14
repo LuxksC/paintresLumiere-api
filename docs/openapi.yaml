@@ -253,7 +253,10 @@ paths:
     get:
       tags: [Products]
       summary: List active products
-      description: Returns all products that are not soft-deleted and do not have `status = inactive`. Products with `status = out_of_stock` are included.
+      description: |
+        Returns all products that are not soft-deleted and do not have `status = inactive`. Products with `status = out_of_stock` are included.
+
+        The list is **deduplicated by SKU** — when multiple variants share a SKU (e.g. same design in different colors/sizes), only the oldest variant of each group is returned as the catalog representative. Items are ordered by `created_at ASC`.
       operationId: getProducts
       responses:
         '200':
@@ -304,6 +307,38 @@ paths:
           description: Invalid or missing token
         '403':
           description: Admin access required
+
+  /products/popular:
+    get:
+      tags: [Products]
+      summary: List popular products
+      description: |
+        Returns the top-selling products, deduplicated by SKU. `sales_count` is aggregated across all variants that share the same SKU. Sorted by total `sales_count` DESC, then `created_at` DESC as a tiebreaker. Used for "Most Popular" sections in clients.
+      operationId: getPopularProducts
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+          description: Maximum number of products to return. Capped at 20.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductListItem'
+        '400':
+          description: Invalid limit value
 
   /products/sku/{sku}:
     get:
@@ -559,6 +594,8 @@ components:
         id:
           type: string
           format: uuid
+        sku:
+          type: string
         name:
           type: string
         slug:
