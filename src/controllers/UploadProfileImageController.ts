@@ -69,8 +69,7 @@ export class UploadProfileImageController {
 
     await StorageService.putObject(process.env.UPLOADS_BUCKET!, key, file, data.contentType);
 
-    const region = process.env.AWS_REGION ?? 'sa-east-1';
-    const image = `https://${process.env.UPLOADS_BUCKET}.s3.${region}.amazonaws.com/${key}`;
+    const image = StorageService.getObjectUrl(process.env.UPLOADS_BUCKET!, key);
 
     return ok({ image });
   }

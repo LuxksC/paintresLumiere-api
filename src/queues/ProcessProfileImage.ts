@@ -30,8 +30,7 @@ export class ProcessProfileImage {
       }
     }
 
-    const region = process.env.AWS_REGION ?? 'sa-east-1';
-    const imageUrl = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+    const imageUrl = StorageService.getObjectUrl(bucket, key);
 
     await db
       .update(usersTable)
