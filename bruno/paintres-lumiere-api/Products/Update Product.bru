@@ -23,6 +23,26 @@ body:json {
   }
 }
 
+docs {
+  Admin-only. Every field is optional — only what is sent gets updated.
+
+  `images` accepts a full array of URLs and REPLACES the stored array, consistent with how every
+  other field on this endpoint behaves. That makes it the way to reorder product images or pick
+  the main one (the first element), which matters because the processProductImage SQS consumer
+  appends in delivery order and standard SQS queues do not guarantee ordering.
+
+  Example reordering payload:
+
+  {
+    "images": [
+      "https://paintres-lumiere-uploads.s3.sa-east-1.amazonaws.com/product-images/<id>/<a>.jpg",
+      "https://paintres-lumiere-uploads.s3.sa-east-1.amazonaws.com/product-images/<id>/<b>.jpg"
+    ]
+  }
+
+  Note: `sales_count` is settable only on Create Product, not here.
+}
+
 vars:pre-request {
   productId: 8f3e2b14-6a9d-4c32-b101-5e7f8a9b0c12
 }
