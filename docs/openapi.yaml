@@ -439,6 +439,74 @@ paths:
         '404':
           description: Product not found or already deleted
 
+  /products/{productId}/images:
+    post:
+      tags: [Products]
+      summary: Upload a product image
+      description: |
+        Admin only. Accepts a `multipart/form-data` request with a single file field named `file`.
+        The API uploads the image to S3 itself — **the client never talks to S3 directly**.
+
+        Object key: `product-images/{productId}/{uuid}.{ext}`.
+
+        Allowed types: `image/png`, `image/jpeg`, `image/jpg`, `image/heic`, `image/webp`.
+        Max size: **4 MB** — API Gateway base64-encodes binary payloads before passing them to
+        Lambda (~33% overhead), so a larger file would exceed Lambda's 6 MB event payload limit.
+
+        The returned URL is appended to `products.images` **asynchronously** by the
+        `processProductImage` SQS consumer, so it may take a moment to appear on
+        `GET /products/sku/{sku}`.
+
+        > **Ordering is not guaranteed.** Standard SQS queues do not preserve delivery order, so
+        > uploading several images for one product may store them out of sequence. Use
+        > `PUT /products/{id}` with a full `images` array to fix the order and choose the main
+        > image (the first element).
+
+        Objects under `product-images/` are publicly readable; `profile-images/` are not.
+      operationId: uploadProductImage
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Product UUID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (png, jpeg, jpg, heic, webp — max 4 MB)
+      responses:
+        '200':
+          description: OK — image stored; products.images updated within seconds
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  image:
+                    type: string
+                    format: uri
+                    description: Public S3 URL of the uploaded image
+        '400':
+          description: Missing file, unsupported type, file too large, or invalid product id
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Admin access required
+        '404':
+          description: Product not found
+
 components:
   securitySchemes:
     bearerAuth:
@@ -734,6 +802,20 @@ components:
         dimensions_unit:
           type: string
           default: mm
+        images:
+          type: array
+          description: |
+            Image URLs. Normally populated by uploading through
+            `POST /products/{productId}/images` rather than set here directly.
+          items:
+            type: string
+            format: uri
+        sales_count:
+          type: integer
+          minimum: 0
+          description: |
+            Seeds the sales counter that `GET /products/popular` orders by. Settable on create
+            only — there is no way to change it afterwards through the API.
 
     UpdateProductRequest:
       type: object
@@ -784,3 +866,11 @@ components:
           format: float
         dimensions_unit:
           type: string
+        images:
+          type: array
+          description: |
+            REPLACES the stored array, like every other field on this endpoint. This is how you
+            reorder a product's images or choose the main one (the first element).
+          items:
+            type: string
+            format: uri

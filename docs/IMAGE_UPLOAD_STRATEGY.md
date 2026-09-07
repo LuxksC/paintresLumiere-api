@@ -55,8 +55,9 @@ Files are organized using **key prefixes**, which work like folders:
 
 ```
 paintres-lumiere-uploads/
-  profile-images/{userId}/{uuid}.jpg    ← profile pictures
-  svg-assets/{userId}/{uuid}.svg        ← future: user-uploaded SVG assets
+  profile-images/{userId}/{uuid}.jpg       ← profile pictures
+  product-images/{productId}/{uuid}.jpg    ← catalog photos
+  svg-assets/{userId}/{uuid}.svg           ← future: user-uploaded SVG assets
 ```
 
 ### Why one bucket instead of many?
@@ -77,6 +78,23 @@ With prefixes, you get the same separation:
 4. Call `StorageService.getPresignedUpload()` from the new controller with the new prefix and options.
 
 The `StorageService` already accepts `bucket`, `key`, `contentType`, and `maxFileSizeBytes` as parameters — nothing needs to change in the service itself.
+
+---
+
+## Architecture decision: clients never talk to S3
+
+The client communicates **only with the API**. No route hands out a presigned upload URL or any
+other means of addressing S3 directly. Product image upload (`POST /products/{productId}/images`)
+follows this: the API receives the file and performs the `PutObject` itself.
+
+The cost is real and accepted: every image byte crosses the Lambda, which consumes execution time
+and caps uploads at ~4 MB (Lambda's event payload limit is 6 MB and the binary arrives
+base64-encoded, adding ~33%). The benefit is a single, auditable surface for clients.
+
+Note that the surviving presigned-upload route for profile pictures
+(`GET /profile/image/upload-url`) contradicts this decision and is scheduled for removal. The
+sections above that argue for the presigned pattern predate this decision and will be rewritten
+with that removal.
 
 ---
 

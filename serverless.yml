@@ -135,6 +135,13 @@ functions:
           path: /products/{id}
           method: DELETE
 
+  uploadProductImage:
+    handler: src/functions/uploadProductImage.handler
+    events:
+      - httpApi:
+          path: /products/{productId}/images
+          method: POST
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:
