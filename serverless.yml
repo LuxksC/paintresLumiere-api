@@ -218,6 +218,13 @@ resources:
         - ProductImagesQueuePolicy
       Properties:
         BucketName: paintres-lumiere-uploads
+        # Product images are catalog content and must be readable by the apps (see UploadsBucketPolicy
+        # below). ACLs stay blocked — public read is granted by bucket policy on one prefix only.
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: false
+          RestrictPublicBuckets: false
         NotificationConfiguration:
           QueueConfigurations:
             - Event: 's3:ObjectCreated:*'
@@ -234,3 +241,18 @@ resources:
                     - Name: prefix
                       Value: product-images/
               Queue: !GetAtt ProductImagesQueue.Arn
+
+    # Public read on product-images/ only. profile-images/ stays private: profile pictures are
+    # personal data and must not be world-readable.
+    UploadsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref UploadsBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: PublicReadProductImages
+              Effect: Allow
+              Principal: '*'
+              Action: s3:GetObject
+              Resource: !Join ['', [!GetAtt UploadsBucket.Arn, '/product-images/*']]
