@@ -3,6 +3,7 @@ import { db } from '../db';
 import { productsTable } from '../db/schema';
 import type { ProtectedHttpRequest, HttpResponse } from '../types/Http';
 import { badRequest, created } from '../utils/http';
+import { getDefaultTenantId } from '../utils/defaultTenant';
 import { requireAdmin } from '../utils/requireAdmin';
 import { generateSlug } from '../utils/string';
 
@@ -36,10 +37,12 @@ export class CreateProductController {
     if (!success) return badRequest({ errors: error.flatten().fieldErrors });
 
     const slug = generateSlug(data.name);
+    const tenantId = await getDefaultTenantId();
 
     const [product] = await db
       .insert(productsTable)
       .values({
+        tenantId,
         sku: data.sku,
         name: data.name,
         slug,

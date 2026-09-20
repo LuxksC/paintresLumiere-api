@@ -1,6 +1,6 @@
 # Multi-Tenant Admin Specification
 
-> Forward-looking spec for the **next** feature up in Trello's Phase 0 (cards #75, #76, #186, #187, #188, plus the Phase-2 admin endpoints #193, #200 and the Phase-5 tests #202 that depend on it). Not started — no code exists against this yet. The design decisions below are not new; they were already made in `HANDOFF.md` §7 ("Addendum — admin roles are in scope") and on the Trello board. This spec formalizes them into EARS-testable criteria instead of re-litigating them.
+> Spec for Trello's Phase 0 tenant/admin work (cards #75, #76, #186, #187, #188, plus the Phase-2 admin endpoints #193, #200 and the Phase-5 tests #202 that depend on it). **Card #75 (schema + migration) is done — implemented, reviewed, and its migration applied to the real database. #76 is next, per board order; #186, #187, #188 are not started** (there is no `super_admin` in the `user_type` enum yet — that's #186). The design decisions below are not new; they were already made in `HANDOFF.md` §7 ("Addendum — admin roles are in scope") and on the Trello board — this spec formalizes them into EARS-testable criteria and, for #75, was corrected against each card's actual description (`get_card` on #75/#76/#186) rather than the earlier paraphrase from HANDOFF alone.
 
 ## Problem Statement
 
@@ -8,7 +8,7 @@ The app is growing an admin-only tab for managing the catalog. Today `users.type
 
 ## Goals
 
-- [ ] Every `products` row (and future `orders`/`carts` rows) is scoped to a tenant.
+- [x] A `tenants` table exists, and every `users`/`products` row is scoped to one (#75 — done, migration applied to the real database). Future `orders`/`carts` rows inherit the same expectation (CLAUDE.md: "every new table is born with a `tenant_id`").
 - [ ] A `super_admin` (lead developer) can act on any tenant; a `tenant_admin` (business owner) can only act on their own tenant(s).
 - [ ] Every route currently gated by `requireAdmin` is re-gated by tenant-aware authorization without silently widening access.
 - [ ] The client can tell whether to show the Admin tab from `GET /profile` alone, no extra round trip.
@@ -33,6 +33,10 @@ The app is growing an admin-only tab for managing the catalog. Today `users.type
 | JWT/profile shape | JWT gains `role` and `tenantId` claims; `GET /profile` gains `role`, `adminOf`, `isSuperAdmin` | HANDOFF.md §7 | y |
 | Tokens issued before this change | Absent `role` claim is treated as `client` | HANDOFF.md §7 — backward compatibility for tokens already in the wild | y |
 | Migration ordering | Land before `cart-and-orders` (Phase 3), never after | HANDOFF.md §7 — retrofitting tenant scoping onto transactional tables later is far more expensive | y |
+| `tenant_id` needs a real `tenants` table, not just a bare column | `tenants`: `id, name, slug (unique), document (CNPJ, nullable), timestamps, deleted_at`. `tenant_id` FK added to **both** `users` and `products` (not only `products`) | Trello #75's actual description — the earlier draft of this spec, written from HANDOFF.md's paraphrase alone, missed the `tenants` table and the `users.tenant_id` column entirely | y |
+| How #75's migration avoids breaking existing rows | Three-step: (1) add `tenants` + nullable `tenant_id` on both tables + composite indexes, (2) seed one "Paintres Lumière" tenant (`slug: paintres-lumiere`) and backfill every pre-existing row to it, (3) `SET NOT NULL` | Trello #75 explicitly asks for a two-step column migration; splitting seed+backfill into its own step keeps each Drizzle migration a single concern | y |
+| Where a **new** user/product's `tenant_id` comes from, until #76 adds real tenant resolution | Every signup/Google-signup/product-create resolves the single seed tenant by slug (`getDefaultTenantId()`) and uses it — there is exactly one tenant until #76 | Card #75 is explicit: "apenas coluna preparada... não há cadastro de tenant nem resolução por subdomínio nesta fase." Something has to satisfy the new `NOT NULL` constraint on every insert in the meantime, and a lookup-by-slug is the only option that doesn't invent tenant-resolution logic #76 hasn't designed yet | y — but `getDefaultTenantId()` and every call site is scaffolding meant to be replaced by #76's real resolution, not a permanent API |
+| `requireAdmin` / query scoping / per-tenant uniqueness | **Not** part of #75.** Card #76 ("Escopo de tenant nas queries existentes") explicitly depends on #75 and owns: reading `tenant_id` from the JWT in protected routes, scoping every existing controller's queries, resolving tenant for **public** catalog routes (header/query param, falling back to the default tenant — #76 to document the exact mechanism), turning `requireAdmin` into a tenant-scoped check, and making email/CPF/CNPJ uniqueness per-tenant instead of global | Trello #76's description | y |
 | A tenant admin who administers more than one tenant | JWT carries `adminOf: string[]` (every tenant id the user administers) instead of a single `tenantId`; `requireTenantAdmin(userId, tenantId)` allows when `isSuperAdmin` or `tenantId ∈ adminOf` — no DB call needed on the hot path. `tenantId` for a resource-scoped mutation is read from the resource's own `tenant_id` column, never the client; for an ambiguous tenant-scoped listing, a client-supplied `tenantId` is accepted only as a selector and is cross-checked against `adminOf` before use — it is never trusted on its own | AD-006 in `.specs/STATE.md` — keeps one token usable across every tenant a manager administers, avoids a login/switch-tenant flow, and preserves the "never trust a client-supplied tenant" property from AC 5 below by only ever using client input to *select within* the token's own authorized set | y |
 
 **Open questions:** none carried over from HANDOFF/Trello. Two implicit-requirement gaps surfaced while writing this spec; one is resolved below, one is logged as a real open question:
@@ -44,19 +48,29 @@ The app is growing an admin-only tab for managing the catalog. Today `users.type
 
 ## User Stories
 
-### P1: Scope products to a tenant ⭐ MVP
+### P1: Introduce tenants and scope `users`/`products` to one ⭐ MVP — Trello #75
 
-**User Story**: As the system, I want every product to belong to exactly one tenant, so a future tenant-scoped query never leaks another tenant's catalog.
+**User Story**: As the system, I want a real `tenants` table and every `user`/`product` to belong to exactly one tenant, so a future tenant-scoped query has something to scope by and never leaks another tenant's data.
 
-**Why P1**: Every other story in this feature depends on the column existing.
+**Why P1**: Every other story in this feature (and every future tenant-scoped table — carts, orders, payments) depends on this existing first, and it has to land before those transactional tables exist (HANDOFF §7 / AD-004).
 
 **Acceptance Criteria**:
 
-1. The system SHALL add a `tenant_id` column to `products`, not nullable after backfill.
-2. WHEN the migration runs THEN the system SHALL backfill every existing `products` row to the default/legacy tenant (see Assumptions).
-3. WHILE any query reads or writes `products` THEN the system SHALL scope it by `tenant_id` (super admin queries excepted, see P2).
+1. The system SHALL provide a `tenants` table (`id`, `name`, `slug` unique, `document` nullable, timestamps, `deleted_at`).
+2. The system SHALL add a `tenant_id` column, FK to `tenants.id`, to **both** `users` and `products`, `NOT NULL` after backfill.
+3. WHEN the migration runs THEN the system SHALL seed one tenant (`slug: paintres-lumiere`) and backfill every pre-existing `users`/`products` row to it, before the `NOT NULL` constraint is applied.
+4. The system SHALL add composite indexes `(tenant_id, deleted_at)` on `products` and `(tenant_id, email)` on `users`.
+5. WHEN a JWT is issued (`POST /signup`, `POST /login`, `POST /auth/google`) THEN the token SHALL include a `tenantId` claim, so protected controllers can scope without an extra query (consuming it is #76's job — this AC only covers *issuing* it).
+6. WHEN a new `user` or `product` is inserted (signup, Google sign-in of a new user, `POST /products`) THEN the system SHALL resolve `tenant_id` to the single seed tenant (`getDefaultTenantId()`), since no real tenant-resolution mechanism exists yet.
+7. The system SHALL NOT scope any existing query by `tenant_id` yet, and SHALL NOT change `requireAdmin`'s behavior — that is Trello #76, a separate card/branch.
 
-**Independent Test**: After migration, every row in `products` has a non-null `tenant_id`; a query filtered by a different tenant's id returns zero of the pre-existing rows.
+**Independent Test**: After migration, every row in `users` and `products` has a non-null `tenant_id` pointing at the seed tenant; signing up a new user and decoding the returned JWT shows a `tenantId` claim matching that same tenant.
+
+---
+
+### (Trello #76 — not started) Scope existing queries by tenant
+
+Tracked here only so the boundary with #75 is explicit; not part of this implementation pass. Will own: reading `tenant_id` from the JWT in every protected controller, resolving a tenant for the public catalog routes (no JWT present), turning `requireAdmin` into a tenant-scoped check, associating signup with a *resolved* tenant instead of #75's hardcoded default, and making email/CPF/CNPJ uniqueness per-tenant.
 
 ---
 
@@ -107,15 +121,19 @@ The app is growing an admin-only tab for managing the catalog. Today `users.type
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| TENANT-01 | P1: Scope products to a tenant | Pending | Pending |
-| TENANT-02 | P1: Scope products to a tenant | Pending | Pending |
-| TENANT-03 | P1: Scope products to a tenant | Pending | Pending |
-| TENANT-04 | P1: Two-level admin authorization | Pending | Pending |
-| TENANT-05 | P1: Two-level admin authorization | Pending | Pending |
-| TENANT-06 | P1: Two-level admin authorization | Pending | Pending |
-| TENANT-07 | P2: Expose role and tenant | Pending | Pending |
+| TENANT-01 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected (`src/db/schema.ts`, `drizzle/0006`-`0008`) |
+| TENANT-02 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected |
+| TENANT-03 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected (`drizzle/0007_seed_and_backfill_default_tenant.sql`) |
+| TENANT-04 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected |
+| TENANT-05 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected (`src/libs/jwt.ts`) |
+| TENANT-06 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected (`src/utils/defaultTenant.ts`) |
+| TENANT-07 | P1: Introduce tenants (#75) | Verified | Verified — migration applied to Neon by the user, data synced as expected — no query/`requireAdmin` change made |
+| TENANT-08 | P1: Two-level admin authorization (#186/#187) | Pending | Pending — not started |
+| TENANT-09 | P1: Two-level admin authorization (#186/#187) | Pending | Pending — not started |
+| TENANT-10 | P1: Two-level admin authorization (#186/#187) | Pending | Pending — not started |
+| TENANT-11 | P2: Expose role and tenant (#188) | Pending | Pending — not started |
 
-**Coverage:** 7 total, 0 mapped to tasks yet (Design/Tasks phase not run — do that when this feature is actually picked up; it's Large/Complex per the auto-sizing table, given the auth + state-transition + migration-ordering dimensions).
+**Coverage:** 11 total, 7 verified (#75), 4 pending (#76/#186-188). No formal `tasks.md` was used (no Design/Tasks phase run — #75 was small enough to implement directly from the spec; #76/#186-188 are each their own card/branch and may warrant Design+Tasks given the auth + migration-ordering dimensions). No automated test exists for #75 — this repo has no test framework yet (Trello #164, separate and not started) — verification was `tsc --noEmit` (clean) plus the user applying the migration to the real database and confirming the data synced as expected.
 
 ---
 
