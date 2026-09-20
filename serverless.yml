@@ -142,6 +142,13 @@ functions:
           path: /products/{productId}/images
           method: POST
 
+  processProductImage:
+    handler: src/functions/processProductImage.handler
+    events:
+      - sqs:
+          arn: !GetAtt ProductImagesQueue.Arn
+          batchSize: 1
+
 resources:
   Resources:
     ProfileImagesQueueDLQ:
@@ -174,9 +181,41 @@ resources:
         Queues:
           - !Ref ProfileImagesQueue
 
+    ProductImagesQueueDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: paintres-lumiere-product-images-queue-dlq
+
+    ProductImagesQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: paintres-lumiere-product-images-queue
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt ProductImagesQueueDLQ.Arn
+          maxReceiveCount: 3
+
+    ProductImagesQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: s3.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt ProductImagesQueue.Arn
+              Condition:
+                ArnLike:
+                  aws:SourceArn: arn:aws:s3:::paintres-lumiere-uploads
+        Queues:
+          - !Ref ProductImagesQueue
+
     UploadsBucket:
       Type: AWS::S3::Bucket
-      DependsOn: ProfileImagesQueuePolicy
+      DependsOn:
+        - ProfileImagesQueuePolicy
+        - ProductImagesQueuePolicy
       Properties:
         BucketName: paintres-lumiere-uploads
         NotificationConfiguration:
@@ -188,3 +227,10 @@ resources:
                     - Name: prefix
                       Value: profile-images/
               Queue: !GetAtt ProfileImagesQueue.Arn
+            - Event: 's3:ObjectCreated:*'
+              Filter:
+                S3Key:
+                  Rules:
+                    - Name: prefix
+                      Value: product-images/
+              Queue: !GetAtt ProductImagesQueue.Arn
