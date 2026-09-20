@@ -6,6 +6,7 @@ import { usersTable } from '../db/schema';
 import type { HttpRequest, HttpResponse } from '../types/Http';
 import { signAccessToken } from '../libs/jwt';
 import { badRequest, created } from '../utils/http';
+import { getDefaultTenantId } from '../utils/defaultTenant';
 import { isNonEmptyString } from '../utils/string';
 import { conflictIfUserPropertyExists } from '../utils/userConflict';
 
@@ -57,10 +58,12 @@ export class SignUpController {
     }
 
     const hashedPassword = await hash(password, 10);
+    const tenantId = await getDefaultTenantId();
 
     const [user] = await db
       .insert(usersTable)
       .values({
+        tenantId,
         name,
         type,
         email,
@@ -77,7 +80,7 @@ export class SignUpController {
       return badRequest({ error: 'Failed to create user.' });
     }
 
-    const accessToken = signAccessToken(user.id);
+    const accessToken = signAccessToken(user.id, tenantId);
 
     return created({ accessToken });
   }

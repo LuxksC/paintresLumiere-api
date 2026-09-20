@@ -24,7 +24,7 @@ export class LoginController {
 
     // Check if user exists by email
     const user = await db.query.usersTable.findFirst({
-      columns: { id: true, password: true },
+      columns: { id: true, password: true, tenantId: true },
       where: and(eq(usersTable.email, email), isNull(usersTable.deletedAt)),
     });
 
@@ -43,7 +43,7 @@ export class LoginController {
       return unauthorized({ error: 'Invalid email or password.' });
     }
 
-    const accessToken = signAccessToken(user.id);
+    const accessToken = signAccessToken(user.id, user.tenantId);
 
     return ok({ accessToken });
   }

@@ -52,11 +52,10 @@
 
 ## Handoff
 
-- **Feature**: none in progress — idle between weekend sessions
-- **Phase / Task**: Trello "Phase 0 — Housekeeping" (board: Paintres Lumière, list Backlog). Product-images work (`product-images` feature) just shipped; remaining Phase 0 backend items are next.
-- **Completed**: product image upload endpoint (PL-114), SQS consumer to attach images (PL-115), public-read bucket policy (PL-205) — all merged (PRs #2/#5, #3, #4)
+- **Feature**: `multi-tenant-admin` — Trello card #75 ("Schema e migration de tenants") done; #76/#186-188 not started
+- **Phase / Task**: Execute complete and reviewed by the user (migration applied to the real Neon DB, data synced as expected). Committing and opening the PR now.
+- **Completed**: `.specs/` replacing `HANDOFF.md` and CLAUDE.md's two rules merged to `main` via PR #6 (card #211). Card #75: `tenants` table, `tenant_id` on `users`/`products` (3 migrations: `0006` nullable+table+indexes, `0007` seed+backfill, `0008` NOT NULL — applied by the user), JWT now carries `tenantId` (`src/libs/jwt.ts`), new-row inserts resolve the seed tenant via `src/utils/defaultTenant.ts` (`SignUpController`, `GoogleAuthController`, `CreateProductController`). `tsc --noEmit` clean.
 - **In-progress**: none
-- **Next step**: Pick the next Phase 0 backend item in Trello board order — tenant schema/migration (card #75), then query scoping (#76), then move the committed JWT out of `bruno/paintres-lumiere-api/environments/Local.bru` (#78). See `.specs/features/multi-tenant-admin/spec.md` for the tenant/role work.
-- **Blockers**: Asaas account/sandbox not opened yet (blocks Phase 4 payments, see AD-005); AWS SES not provisioned (blocks forgot/reset-password, Trello #95-97); Google Cloud OAuth client not created (blocks iOS Google Sign-In wiring, Trello #77) — all three are owner/infra actions, not code.
-- **Uncommitted files**: none (only `HANDOFF.md`, untracked, being replaced by this file)
-- **Branch**: `PL-205/feat/ls/public-read-product-images` — already merged into `main` via PR #4; this local branch is stale and safe to delete after `git checkout main && git pull`
+- **Next step**: **Follow Trello board order — card #76 ("Escopo de tenant nas queries existentes") is next**, not #186. The user asked about `super_admin` only to confirm it's on the plan (it is — card #186); explicitly confirmed 2026-09-20 not to jump ahead of the board order to build it now.
+- **Blockers**: Asaas account/sandbox not opened yet (blocks Phase 4 payments, see AD-005); AWS SES not provisioned (blocks forgot/reset-password, Trello #95-97); Google Cloud OAuth client not created (blocks iOS Google Sign-In wiring, Trello #77) — all three are owner/infra actions, not code. `super_admin` cannot be assigned to any user yet — the `user_type` enum is still `admin | client` only; that value is added by card #186 (not started).
+- **Branch**: `PL-75/feat/ls/tenant-schema-and-migration`, off `main` post-#211-merge

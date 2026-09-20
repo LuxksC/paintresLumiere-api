@@ -1,7 +1,7 @@
 import { type JwtPayload, sign, verify } from 'jsonwebtoken';
 
-export function signAccessToken(userId: string): string {
-  const accessToken = sign({ sub: userId }, process.env.JWT_SECRET ?? '', {
+export function signAccessToken(userId: string, tenantId: string): string {
+  const accessToken = sign({ sub: userId, tenantId }, process.env.JWT_SECRET ?? '', {
     expiresIn: '3d',
   });
 
