@@ -24,6 +24,7 @@ const schema = z.object({
   width: z.number().positive().optional(),
   length: z.number().positive().optional(),
   dimensions_unit: z.string().max(10).optional(),
+  images: z.array(z.string().url()).optional(),
 });
 
 export class UpdateProductController {
@@ -65,6 +66,7 @@ export class UpdateProductController {
     if (data.width !== undefined) updates.width = data.width;
     if (data.length !== undefined) updates.length = data.length;
     if (data.dimensions_unit) updates.dimensionsUnit = data.dimensions_unit;
+    if (data.images) updates.images = data.images;
 
     await db
       .update(productsTable)

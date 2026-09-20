@@ -23,6 +23,8 @@ const schema = z.object({
   width: z.number().positive().optional(),
   length: z.number().positive().optional(),
   dimensions_unit: z.string().max(10).optional(),
+  images: z.array(z.string().url()).optional(),
+  sales_count: z.number().int().min(0).optional(),
 });
 
 export class CreateProductController {
@@ -55,6 +57,8 @@ export class CreateProductController {
         ...(data.width !== undefined ? { width: data.width } : {}),
         ...(data.length !== undefined ? { length: data.length } : {}),
         ...(data.dimensions_unit ? { dimensionsUnit: data.dimensions_unit } : {}),
+        ...(data.images ? { images: data.images } : {}),
+        ...(data.sales_count !== undefined ? { salesCount: data.sales_count } : {}),
       })
       .returning({ id: productsTable.id, slug: productsTable.slug });
 

@@ -130,6 +130,7 @@ These are passed to Lambda via `serverless.yml` under `provider.environment`. Se
 | POST   | `/products` | Bearer (admin) | Create a product variant |
 | PUT    | `/products/{id}` | Bearer (admin) | Update an existing product |
 | DELETE | `/products/{id}` | Bearer (admin) | Soft-delete a product (sets `deleted_at` and `status = inactive`) |
+| POST   | `/products/{productId}/images` | Bearer (admin) | Upload a product image through the API (multipart, max 4 MB) |
 
 ### GET /status
 
@@ -340,6 +341,27 @@ Returns **every** active variant matching the SKU with full color/dimension deta
 
 **Response (200):** `{ "message": "Product updated successfully." }`
 **Errors:** 400 validation or missing id, 401 missing/invalid token, 403 non-admin, 404 product not found (or already soft-deleted).
+
+### POST /products/{productId}/images
+
+Admin only. `multipart/form-data` with a single file field named `file`.
+
+The API receives the file and uploads it to S3 itself — **the client never communicates with S3
+directly**. Stored under `product-images/{productId}/{uuid}.{ext}`.
+
+Allowed types: `image/png`, `image/jpeg`, `image/jpg`, `image/heic`, `image/webp`. Max **4 MB**
+(Lambda's event payload limit is 6 MB and binary arrives base64-encoded, adding ~33%).
+
+Responds with the final image URL:
+
+```json
+{ "image": "https://paintres-lumiere-uploads.s3.sa-east-1.amazonaws.com/product-images/<id>/<uuid>.png" }
+```
+
+The URL is appended to `products.images` **asynchronously** by the `processProductImage` SQS
+consumer, so it takes a moment to appear on `GET /products/sku/{sku}`. Ordering is not guaranteed
+across concurrent uploads — reorder with `PUT /products/{id}` and a full `images` array, whose
+first element is the main image.
 
 ### DELETE /products/{id}
 

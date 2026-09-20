@@ -1,0 +1,40 @@
+meta {
+  name: Upload Product Image
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/products/{{productId}}/images
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart-form {
+  file: @file(/absolute/path/to/product-photo.png)
+}
+
+vars:pre-request {
+  productId: 4d955c78-36be-4089-84ab-f93cabcf818e
+}
+
+docs {
+  Admin-only. The API receives the file and uploads it to S3 itself — the client never talks to
+  S3 directly.
+
+  Key format: product-images/{productId}/{uuid}.{ext}
+  Allowed types: image/jpeg, image/png, image/heic, image/webp
+  Max size: 4 MB (Lambda's event payload is capped at 6 MB and the binary arrives base64-encoded)
+
+  The response returns the final image URL. The URL is appended to products.images asynchronously
+  by the processProductImage SQS consumer, so it may take a moment to show up on
+  GET /products/sku/{sku}.
+
+  Ordering is not guaranteed when several uploads for the same product are in flight — standard
+  SQS queues do not preserve delivery order. Use Update Product with a full `images` array to fix
+  the order and choose the main image (the first element).
+}

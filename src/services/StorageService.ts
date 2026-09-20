@@ -1,6 +1,7 @@
 import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { s3Client } from '../clients/s3Client';
+import { AWS_REGION } from '../utils/aws';
 
 export type PresignedUpload = {
   url: string;
@@ -40,6 +41,10 @@ export class StorageService {
 
   static async deleteObject(bucket: string, key: string): Promise<void> {
     await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  }
+
+  static getObjectUrl(bucket: string, key: string): string {
+    return `https://${bucket}.s3.${AWS_REGION}.amazonaws.com/${key}`;
   }
 
   static isS3Url(url: string, bucket: string): boolean {
