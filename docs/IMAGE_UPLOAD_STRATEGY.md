@@ -55,8 +55,8 @@ Files are organized using **key prefixes**, which work like folders:
 
 ```
 paintres-lumiere-uploads/
-  profile-images/{userId}/{uuid}.jpg       ← profile pictures
-  product-images/{productId}/{uuid}.jpg    ← catalog photos
+  profile-images/{userId}/{uuid}.jpg       ← profile pictures        (private)
+  product-images/{productId}/{uuid}.jpg    ← catalog photos          (public read)
   svg-assets/{userId}/{uuid}.svg           ← future: user-uploaded SVG assets
 ```
 
@@ -81,7 +81,42 @@ The `StorageService` already accepts `bucket`, `key`, `contentType`, and `maxFil
 
 ---
 
-## Architecture decision: clients never talk to S3
+## Serving images back to clients
+
+Uploading is only half the problem. An object in S3 is not readable by anyone until something
+grants read access, and this bucket blocks public access by default.
+
+Two prefixes, two different answers:
+
+| Prefix | Readable by | How |
+|---|---|---|
+| `product-images/` | anyone | bucket policy granting `s3:GetObject` on that prefix |
+| `profile-images/` | nobody, currently | — |
+
+Catalog photos are public content by nature: every reseller browsing the app sees the same
+pictures, and they benefit from being cacheable. So `UploadsBucketPolicy` in `serverless.yml`
+grants anonymous `s3:GetObject` on `product-images/*` **and nothing else**, and the bucket's
+`PublicAccessBlockConfiguration` relaxes `BlockPublicPolicy` and `RestrictPublicBuckets` so that
+policy can take effect. ACL-based public access stays blocked — `ObjectOwnership` is
+`BucketOwnerEnforced`, so ACLs are disabled entirely and the bucket policy is the only way in.
+
+Profile pictures are personal data and deliberately stay private.
+
+### Known issue: S3 profile pictures are unreachable
+
+`ProcessProfileImage` writes `https://{bucket}.s3.{region}.amazonaws.com/{key}` into `users.image`,
+but nothing grants read access to `profile-images/`, so that URL returns **403 AccessDenied** to
+every client. In practice only Google-provided pictures render today, because those are served from
+Google's CDN and never touch S3.
+
+Making them public is the wrong fix — they are personal data. The right fix is **CloudFront with
+Origin Access Control**: the bucket stays fully private, CloudFront serves the objects, and the
+stored URL becomes a CloudFront URL. That also gives CDN caching and cheaper egress for product
+images, so it is worth doing for both prefixes at once.
+
+Tracked on the board as *"[Backend] Tornar as imagens armazenadas legíveis pelo cliente"*.
+
+### Architecture decision: clients never talk to S3
 
 The client communicates **only with the API**. No route hands out a presigned upload URL or any
 other means of addressing S3 directly. Product image upload (`POST /products/{productId}/images`)
@@ -92,9 +127,9 @@ and caps uploads at ~4 MB (Lambda's event payload limit is 6 MB and the binary a
 base64-encoded, adding ~33%). The benefit is a single, auditable surface for clients.
 
 Note that the surviving presigned-upload route for profile pictures
-(`GET /profile/image/upload-url`) contradicts this decision and is scheduled for removal. The
-sections above that argue for the presigned pattern predate this decision and will be rewritten
-with that removal.
+(`GET /profile/image/upload-url`) contradicts this decision and is scheduled for removal — see
+*"[Backend] Remover comunicação direta do cliente com o S3"*. The sections below that argue for the
+presigned pattern predate this decision and will be rewritten with that card.
 
 ---
 

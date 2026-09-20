@@ -352,7 +352,7 @@ directly**. Stored under `product-images/{productId}/{uuid}.{ext}`.
 Allowed types: `image/png`, `image/jpeg`, `image/jpg`, `image/heic`, `image/webp`. Max **4 MB**
 (Lambda's event payload limit is 6 MB and binary arrives base64-encoded, adding ~33%).
 
-Responds with the final image URL:
+Responds with the final public URL:
 
 ```json
 { "image": "https://paintres-lumiere-uploads.s3.sa-east-1.amazonaws.com/product-images/<id>/<uuid>.png" }
@@ -362,6 +362,9 @@ The URL is appended to `products.images` **asynchronously** by the `processProdu
 consumer, so it takes a moment to appear on `GET /products/sku/{sku}`. Ordering is not guaranteed
 across concurrent uploads — reorder with `PUT /products/{id}` and a full `images` array, whose
 first element is the main image.
+
+Objects under `product-images/` are publicly readable. `profile-images/` are not — see
+[Image Upload Strategy](docs/IMAGE_UPLOAD_STRATEGY.md).
 
 ### DELETE /products/{id}
 
