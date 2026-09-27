@@ -6,6 +6,7 @@ import { verifyGoogleIdToken } from '../libs/googleIdToken';
 import { signAccessToken } from '../libs/jwt';
 import { StorageService } from '../services/StorageService';
 import type { HttpRequest, HttpResponse } from '../types/Http';
+import { getDefaultTenantId } from '../utils/defaultTenant';
 import { badRequest, conflict, ok, unauthorized } from '../utils/http';
 
 const schema = z.object({
@@ -44,17 +45,17 @@ export class GoogleAuthController {
     const sub = googleUser.sub;
 
     const byGoogle = await db.query.usersTable.findFirst({
-      columns: { id: true, googleSub: true },
+      columns: { id: true, googleSub: true, tenantId: true },
       where: and(eq(usersTable.googleSub, sub), isNull(usersTable.deletedAt)),
     });
 
     if (byGoogle) {
       // find a active user with google token registered in database.
-      return ok({ accessToken: signAccessToken(byGoogle.id) });
+      return ok({ accessToken: signAccessToken(byGoogle.id, byGoogle.tenantId) });
     }
 
     const byEmail = await db.query.usersTable.findFirst({
-      columns: { id: true, googleSub: true, image: true },
+      columns: { id: true, googleSub: true, image: true, tenantId: true },
       where: and(eq(usersTable.email, email), isNull(usersTable.deletedAt)),
     });
 
@@ -82,7 +83,7 @@ export class GoogleAuthController {
         .set(updateData)
         .where(eq(usersTable.id, byEmail.id));
 
-      return ok({ accessToken: signAccessToken(byEmail.id) });
+      return ok({ accessToken: signAccessToken(byEmail.id, byEmail.tenantId) });
     }
 
     // it does not find a user with the info given by google in the database.
@@ -93,10 +94,12 @@ export class GoogleAuthController {
       email.split('@')[0];
     const lastname = googleUser.familyName?.trim();
     const picture = googleUser.picture?.trim();
+    const tenantId = await getDefaultTenantId();
 
     const [created] = await db
       .insert(usersTable)
       .values({
+        tenantId,
         name,
         ...(lastname ? { lastname } : {}),
         email,
@@ -109,6 +112,6 @@ export class GoogleAuthController {
       return badRequest({ error: 'Failed to create user.' });
     }
 
-    return ok({ accessToken: signAccessToken(created.id) });
+    return ok({ accessToken: signAccessToken(created.id, tenantId) });
   }
 }

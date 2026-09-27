@@ -43,6 +43,27 @@
       "when": 1779663979015,
       "tag": "0005_complex_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789938842574,
+      "tag": "0006_add_tenants_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789938850839,
+      "tag": "0007_seed_and_backfill_default_tenant",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789938880013,
+      "tag": "0008_tenant_id_not_null",
+      "breakpoints": true
     }
   ]
 }

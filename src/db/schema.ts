@@ -17,8 +17,20 @@ export const userType = pgEnum('user_type', [
   'client'
 ]);
 
+// Every table added from here on is born with a tenant_id — see CLAUDE.md.
+export const tenantsTable = pgTable('tenants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).unique().notNull(),
+  document: varchar('document', { length: 14 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
 export const usersTable = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenantsTable.id),
   name: varchar('name', { length: 255 }).notNull(),
   lastname: varchar('lastname', { length: 255 }),
   type: userType().notNull().default('client'),
@@ -32,7 +44,9 @@ export const usersTable = pgTable('users', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
-});
+}, (table) => [
+  index('idx_users_tenant_email').on(table.tenantId, table.email),
+]);
 
 export const productColor = pgEnum('product_color', [
   'gold',
@@ -58,6 +72,7 @@ export const productStatus = pgEnum('product_status', [
 
 export const productsTable = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenantsTable.id),
   sku: varchar('sku', { length: 50 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
@@ -82,4 +97,5 @@ export const productsTable = pgTable('products', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('idx_products_sku').on(table.sku),
+  index('idx_products_tenant_deleted').on(table.tenantId, table.deletedAt),
 ]);
